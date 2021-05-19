@@ -38,7 +38,7 @@ class dataInterface:
         self.freq_axis = (np.arange(self.fft_size) - self.fft_size//2)*(Fs/self.fft_size)
         self.sample_size = 8192*4 + 4 + 4 #bytes/sample
 
-    def load(self, start_sample = 0, end_sample = "all", verbose = 1,
+    def load(self, start_sample = 0, end_sample = "all", verbose = 0,
             recenter = 1):
         """
         Load data from the data file.
@@ -105,7 +105,7 @@ class dataInterface:
         fig.show()
 
         fig, ax = plt.subplots()
-        ax.plot(self.freq_axis/1e6,self.data[sample_number].cc['real']**2 + self.data[sample_number].cc['imag']**2)
+        ax.plot(self.freq_axis/1e6,np.sqrt(self.data[sample_number].cc['real'].astype(float)**2 + self.data[sample_number].cc['imag'].astype(float)**2))
         plt.grid(linestyle = '--')
         plt.xticks(np.arange(-60,61,10))
         plt.xlabel("Frequency (MHz)")
@@ -126,7 +126,7 @@ class dataInterface:
         plt.xticks(np.arange(-60,61,10))
         plt.xlabel("Frequency (MHz)")
         plt.ylabel("Real{cross correlation} (counts)")
-        plt.title("Real part of cross correlation, sample number " + str(sample_number))
+        plt.title("Real{cross corr.}, sample number " + str(sample_number))
         if ylimits != "":
             plt.ylim(ylimits)
         if xlimits != "":
@@ -141,7 +141,7 @@ class dataInterface:
         plt.xticks(np.arange(-60,61,10))
         plt.xlabel("Frequency (MHz)")
         plt.ylabel("Imaginary{cross correlation} (counts)")
-        plt.title("Imaginary part of cross correlation, sample number " + str(sample_number))
+        plt.title("Imag{cross corr.}, sample number " + str(sample_number))
         if ylimits != "":
             plt.ylim(ylimits)
         if xlimits != "":
@@ -173,10 +173,14 @@ class dataInterface:
         idx = np.zeros(len(freq),np.int)
         for i,frequency in enumerate(freq):
             idx[i] = (np.abs(self.freq_axis - frequency)).argmin()
-        if chan == 1:
+        if chan == 'psd1':
             return self.data[sample].psd1[idx]
-        if chan == 2:
+        if chan == 'psd2':
             return self.data[sample].psd2[idx]
+        if chan == 'ccreal':
+            return self.data[sample].cc['real'][idx]
+        if chan == 'ccimag':
+            return self.data[sample].cc['imag'][idx]
 
     def print_value_at(self, sample, freq, extra_values=0):
         """
@@ -232,7 +236,38 @@ class dataInterface:
                 serials.append(struct.unpack('>I',raw_serial[:])[0])
         return np.asarray(serials)
 
+    def psd1_spectral_sum(self):
+        """
+        Returns a numpy array where each element is the sum of the channel 1 psd
+        across the entire spectrum of a particular sample. 
+        """
+        _psd1_spectral_sum = np.array(list(map(lambda sample : np.sum(sample.psd1) - sample.psd1[np.abs(self.freq_axis).argmin()],self.data)))
+        return _psd1_spectral_sum
 
+    def psd2_spectral_sum(self):
+        """
+        Returns a numpy array where each element is the sum of the channel 2 psd
+        across the entire spectrum of a particular sample. 
+        """
+        _psd2_spectral_sum = np.array(list(map(lambda sample : np.sum(sample.psd2) - sample.psd2[np.abs(self.freq_axis).argmin()],self.data)))
+        return _psd2_spectral_sum
+
+    def cross_spectral_sum_real(self):
+        """
+        Returns a numpy array where each element is the sum of the real
+        component across the entire spectrum of a particular sample. 
+        """
+        _cross_spectral_sum_real = np.array(list(map(lambda sample : np.sum(sample.cc['real']) - sample.cc['real'][np.abs(self.freq_axis).argmin()],self.data)))
+        return _cross_spectral_sum_real
+
+    def cross_spectral_sum_imag(self):
+        """
+        Returns a numpy array where each element is the sum of the imag
+        component across the entire spectrum of a particular sample. 
+        """
+        _cross_spectral_sum_imag = np.array(list(map(lambda sample : np.sum(sample.cc['imag']) - sample.cc['imag'][np.abs(self.freq_axis).argmin()],self.data)))
+        return _cross_spectral_sum_imag
+            
 
 class sample:
     """ Data from one sample. This version assumes data
